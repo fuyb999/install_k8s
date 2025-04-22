@@ -21,7 +21,7 @@ func (ik *InstallK8s) ServicePublish() {
 	ik.er.SetRole(publishRole)
 
 	if ik.Params.DoWhat == "start" || ik.Params.DoWhat == "restart" {
-		ik.er.Run("iptables -P FORWARD ACCEPT ; systemctl daemon-reload")
+		ik.needReload()
 	}
 
 	ik.er.Run(fmt.Sprintf("systemctl %s containerd", ik.Params.DoWhat))
@@ -46,7 +46,7 @@ func (ik *InstallK8s) serviceEtcd(etcdRole execremote.Role) {
 	ik.er.SetRole(etcdRole)
 
 	if ik.Params.DoWhat == "start" || ik.Params.DoWhat == "restart" {
-		ik.er.Run("iptables -P FORWARD ACCEPT ; systemctl daemon-reload")
+		ik.needReload()
 	}
 
 	ik.er.Run(fmt.Sprintf("systemctl %s etcd", ik.Params.DoWhat))
@@ -81,7 +81,7 @@ func (ik *InstallK8s) serviceMaster(masterRole execremote.Role) {
 	ik.er.SetRole(masterRole)
 
 	if ik.Params.DoWhat == "start" || ik.Params.DoWhat == "restart" {
-		ik.er.Run("iptables -P FORWARD ACCEPT ; systemctl daemon-reload")
+		ik.needReload()
 	}
 
 	cmds := []string{
@@ -120,7 +120,7 @@ func (ik *InstallK8s) serviceNode(nodeRole execremote.Role) {
 	ik.er.SetRole(nodeRole)
 
 	if ik.Params.DoWhat == "start" || ik.Params.DoWhat == "restart" {
-		ik.er.Run("iptables -P FORWARD ACCEPT ; systemctl daemon-reload")
+		ik.needReload()
 	}
 
 	cmds := []string{
@@ -160,10 +160,11 @@ func (ik *InstallK8s) ServiceDns() {
 	ik.er.SetRole(pridnsRole)
 
 	if ik.Params.DoWhat == "start" || ik.Params.DoWhat == "restart" {
-		ik.er.Run("iptables -P FORWARD ACCEPT ; systemctl daemon-reload")
+		ik.needReload()
 	}
 
-	ik.er.Run(fmt.Sprintf("systemctl %s named-chroot", ik.Params.DoWhat))
+	//ik.er.Run(fmt.Sprintf("systemctl %s named-chroot", ik.Params.DoWhat))
+	ik.er.Run(fmt.Sprintf("systemctl %s named", ik.Params.DoWhat))
 }
 
 func (ik *InstallK8s) checkDoWhat() bool {
@@ -174,4 +175,23 @@ func (ik *InstallK8s) checkDoWhat() bool {
 	}
 
 	return false
+}
+
+func (ik *InstallK8s) needReload() {
+	ik.er.Run(`
+		# 1. 设置 FORWARD 策略（兼容 Ubuntu ufw 和 CentOS firewalld/iptables）
+		if command -v ufw >/dev/null 2>&1; then
+			ufw default allow FORWARD  # Ubuntu 方式
+		elif command -v firewall-cmd >/dev/null 2>&1; then
+			firewall-cmd --permanent --direct --add-rule ipv4 filter FORWARD 0 -j ACCEPT  # CentOS firewalld
+			firewall-cmd --reload
+		else
+			iptables -P FORWARD ACCEPT  # 直接修改 iptables（可能不持久）
+		fi
+		
+		# 2. 仅当 systemctl 可用时才执行 daemon-reload
+		if command -v systemctl >/dev/null 2>&1; then
+			systemctl daemon-reload
+		fi
+`)
 }

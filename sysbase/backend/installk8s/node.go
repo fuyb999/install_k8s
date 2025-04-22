@@ -104,7 +104,7 @@ func (ik *InstallK8s) installNode(masterLbHost string, publishRole, nodeRole exe
 		ik.er.Put(fmt.Sprintf("%s/node/node.gz", ik.SourceDir), "/tmp")
 		cmds = []string{
 			`tar zxvf /tmp/node.gz -C / && rm -rf /tmp/node.gz`,
-			`systemctl daemon-reload && systemctl enable kube-proxy && systemctl enable kubelet && mkdir -p /data/kubelet && chmod 750 /data/kubelet`,
+			`systemctl daemon-reload && systemctl enable kube-proxy && systemctl enable kubelet && mkdir -p /data/apps/kubelet && chmod 750 /data/apps/kubelet`,
 		}
 		cmds = getModifyDnsCmds(cmds, pridnsHost)
 		ik.er.Run(cmds...)

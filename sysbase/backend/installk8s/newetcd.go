@@ -116,7 +116,7 @@ func (ik *InstallK8s) newetcdModifyEtcdConf() {
 	}
 
 	ik.er.SetRole(newetcdRole)
-	ik.er.Run(`rm -rf /data/etcd/* ; sed -i 's#new#existing#g' /usr/lib/systemd/system/etcd.service`)
+	ik.er.Run(`rm -rf /data/apps/etcd/* ; sed -i 's#new#existing#g' /usr/lib/systemd/system/etcd.service`)
 }
 
 func (ik *InstallK8s) newetcdClusterAddnew() {

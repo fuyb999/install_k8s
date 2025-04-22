@@ -63,7 +63,7 @@ func (ik *InstallK8s) InstallEtcd() {
 		ik.er.Put(fmt.Sprintf("%s/etcd/etcd.gz", ik.SourceDir), "/tmp")
 		cmds = []string{
 			`id etcd >& /dev/null || useradd -c "etcd user" -s /sbin/nologin -d /var/lib/etcd -r etcd`,
-			`tar zxvf /tmp/etcd.gz -C / && rm -rf /tmp/etcd.gz && chown -R etcd:etcd /etc/etcd/ssl && mkdir -p /data/etcd && chown -R etcd:etcd /data/etcd && chmod 750 /data/etcd`,
+			`tar zxvf /tmp/etcd.gz -C / && rm -rf /tmp/etcd.gz && chown -R etcd:etcd /etc/etcd/ssl && mkdir -p /data/apps/etcd && chown -R etcd:etcd /data/apps/etcd && chmod 750 /data/apps/etcd`,
 			`systemctl daemon-reload && systemctl enable etcd`,
 		}
 		ik.er.Run(cmds...)
@@ -155,12 +155,49 @@ func (ik *InstallK8s) installLvsvipEtcd(etcdNode execremote.Role) {
 	etcdLbHost := strings.Split(etcdLbRole.Hosts[0], ":")[0]
 
 	ik.er.SetRole(etcdNode)
-	cmds := []string{
-		fmt.Sprintf(`ifconfig lo:etcd:0 %s broadcast %s netmask 255.255.255.255 up && echo -e "#/bin/sh\n# chkconfig:   2345 90 10\nifconfig lo:etcd:0 %s broadcast %s netmask 255.255.255.255 up" > /etc/rc.d/init.d/vip_route_etcd.sh`, etcdLbHost, etcdLbHost, etcdLbHost, etcdLbHost),
-		fmt.Sprintf(`route add -host %s dev lo:etcd:0 && echo "route add -host %s dev lo:etcd:0" >> /etc/rc.d/init.d/vip_route_etcd.sh`, etcdLbHost, etcdLbHost),
-		`chmod +x /etc/rc.d/init.d/vip_route_etcd.sh && chkconfig --add vip_route_etcd.sh && chkconfig vip_route_etcd.sh on`,
 
+	//cmds := []string{
+	//	fmt.Sprintf(`ifconfig lo:etcd:0 %s broadcast %s netmask 255.255.255.255 up && echo -e "#/bin/sh\n# chkconfig:   2345 90 10\nifconfig lo:etcd:0 %s broadcast %s netmask 255.255.255.255 up" > /etc/rc.d/init.d/vip_route_etcd.sh`, etcdLbHost, etcdLbHost, etcdLbHost, etcdLbHost),
+	//	fmt.Sprintf(`route add -host %s dev lo:etcd:0 && echo "route add -host %s dev lo:etcd:0" >> /etc/rc.d/init.d/vip_route_etcd.sh`, etcdLbHost, etcdLbHost),
+	//	`chmod +x /etc/rc.d/init.d/vip_route_etcd.sh && chkconfig --add vip_route_etcd.sh && chkconfig vip_route_etcd.sh on`,
+	//
+	//	`echo "1" > /proc/sys/net/ipv4/conf/lo/arp_ignore && echo "2" > /proc/sys/net/ipv4/conf/lo/arp_announce && echo "1" > /proc/sys/net/ipv4/conf/all/arp_ignore && echo "2" > /proc/sys/net/ipv4/conf/all/arp_announce`,
+	//}
+
+	cmds := []string{
+		// 判断系统类型，选择正确的命令
+		fmt.Sprintf(`
+        if [ -f /etc/redhat-release ]; then
+            ifconfig lo:etcd0 %s netmask 255.255.255.255 up
+            echo -e "#/bin/sh\n# chkconfig: 2345 90 10\nifconfig lo:etcd0 %s netmask 255.255.255.255 up" > /etc/rc.d/init.d/vip_route_etcd.sh
+        else
+            ip addr add %s/32 dev lo label lo:etcd0
+            echo -e '#!/bin/sh\nip addr add %s/32 dev lo label lo:etcd0' > /etc/init.d/vip_route_etcd.sh
+        fi
+    `, etcdLbHost, etcdLbHost, etcdLbHost, etcdLbHost),
+
+		fmt.Sprintf(`
+        if [ -f /etc/redhat-release ]; then
+            route add -host %s dev lo:etcd0
+            echo "route add -host %s dev lo:etcd0" >> /etc/rc.d/init.d/vip_route_etcd.sh
+        else
+            ip route add %s/32 dev lo:etcd0
+            echo "ip route add %s/32 dev lo:etcd0" >> /etc/init.d/vip_route_etcd.sh
+        fi
+    `, etcdLbHost, etcdLbHost, etcdLbHost, etcdLbHost),
+
+		`
+        if [ -f /etc/redhat-release ]; then
+            chmod +x /etc/rc.d/init.d/vip_route_etcd.sh && chkconfig --add vip_route_etcd.sh && chkconfig vip_route_etcd.sh on
+        else
+            chmod +x /etc/init.d/vip_route_etcd.sh && update-rc.d vip_route_etcd.sh defaults
+        fi
+    `,
+
+		// ARP 参数（通用）
 		`echo "1" > /proc/sys/net/ipv4/conf/lo/arp_ignore && echo "2" > /proc/sys/net/ipv4/conf/lo/arp_announce && echo "1" > /proc/sys/net/ipv4/conf/all/arp_ignore && echo "2" > /proc/sys/net/ipv4/conf/all/arp_announce`,
+		`grep -q "arp_ignore" /etc/sysctl.conf || echo -e "net.ipv4.conf.lo.arp_ignore=1\nnet.ipv4.conf.lo.arp_announce=2\nnet.ipv4.conf.all.arp_ignore=1\nnet.ipv4.conf.all.arp_announce=2" >> /etc/sysctl.conf && sysctl -p`,
 	}
+
 	ik.er.Run(cmds...)
 }

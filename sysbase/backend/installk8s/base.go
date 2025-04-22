@@ -160,8 +160,8 @@ func (ik *InstallK8s) InstallTest() {
 	ik.er.SetRole(publishRole)
 
 	cmds := []string{
-		`yum install git -y`,
-		`yum remove git -y`,
+		`apt-get install git -y`,
+		`apt-get remove git -y`,
 	}
 
 	ik.er.Run(cmds...)
@@ -191,7 +191,7 @@ func (ik *InstallK8s) InstallAll() {
 	needUpdateHosts := ik.checkHostsKernel(hosts)
 	if len(needUpdateHosts) > 0 {
 		ik.Stdout <- fmt.Sprintf("请先确保这些机器内核已升级:%v\n", needUpdateHosts)
-		ik.UpdateKernel()
+		//ik.UpdateKernel()
 		return
 	}
 	ik.InstallBase()
@@ -234,14 +234,24 @@ func (ik *InstallK8s) InstallBase() {
 }
 
 func (ik *InstallK8s) installBase() {
+	//cmds := []string{
+	//	fmt.Sprintf(`chown -R root:root %s`, ik.SourceDir),
+	//	"apt-get install -y telnet net-tools openssl socat",
+	//	"mkdir -p /data/apps > /dev/null 2>&1;if [ $? == 0 ];then useradd -d /data/apps/www esn && useradd -d /data/apps/www www && usermod -G esn www && chmod 750 /data/apps/www && mkdir -p /data/apps/log/nginx && chown -R www:www /data/apps/log && chmod 750 /data/apps/log;fi",
+	//	"systemctl stop firewalld && systemctl disable firewalld",
+	//	`sed -i "s#SELINUX=enforcing#SELINUX=disabled#g" /etc/selinux/config && setenforce 0`,
+	//	`cat /etc/sysctl.conf | grep net.ipv4.ip_forward > /dev/null 2>&1 ; if [ $? -ne 0 ];then echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf && sysctl -p;fi`,
+	//	`cat /etc/sysctl.conf | grep net.ipv4.conf.all.rp_filter > /dev/null 2>&1 ; if [ $? -ne 0 ];then echo "net.ipv4.conf.all.rp_filter = 1" >> /etc/sysctl.conf && sysctl -p;fi`,
+	//}
+
 	cmds := []string{
 		fmt.Sprintf(`chown -R root:root %s`, ik.SourceDir),
-		"yum install -y telnet net-tools openssl socat",
-		"mkdir /data > /dev/null 2>&1;if [ $? == 0 ];then useradd -d /data/www esn && useradd -d /data/www www && usermod -G esn www && chmod 750 /data/www && mkdir -p /data/log/nginx && chown -R www:www /data/log && chmod 750 /data/log;fi",
-		"systemctl stop firewalld && systemctl disable firewalld",
-		`sed -i "s#SELINUX=enforcing#SELINUX=disabled#g" /etc/selinux/config && setenforce 0`,
-		`cat /etc/sysctl.conf | grep net.ipv4.ip_forward > /dev/null 2>&1 ; if [ $? -ne 0 ];then echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf && sysctl -p;fi`,
-		`cat /etc/sysctl.conf | grep net.ipv4.conf.all.rp_filter > /dev/null 2>&1 ; if [ $? -ne 0 ];then echo "net.ipv4.conf.all.rp_filter = 1" >> /etc/sysctl.conf && sysctl -p;fi`,
+		"apt-get install -y telnet net-tools openssl socat",
+		"mkdir -p /data/apps > /dev/null 2>&1; if [ $? == 0 ]; then useradd -d /data/apps/www esn && useradd -d /data/apps/www www && usermod -G esn www && chmod 750 /data/apps/www && mkdir -p /data/apps/log/nginx && chown -R www:www /data/apps/log && chmod 750 /data/apps/log; fi",
+		//"systemctl stop ufw && systemctl disable ufw",  // Ubuntu 使用 ufw 而不是 firewalld
+		//`sed -i "s#SELINUX=enforcing#SELINUX=disabled#g" /etc/selinux/config 2>/dev/null || true`, // Ubuntu 默认没有 SELinux
+		`grep -q "net.ipv4.ip_forward" /etc/sysctl.conf || echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf && sysctl -p`,
+		`grep -q "net.ipv4.conf.all.rp_filter" /etc/sysctl.conf || echo "net.ipv4.conf.all.rp_filter = 1" >> /etc/sysctl.conf && sysctl -p`,
 	}
 	ik.er.Run(cmds...)
 }
@@ -291,10 +301,39 @@ func (ik *InstallK8s) checkHostsKernel(hosts []string) []string {
 }
 
 func (ik *InstallK8s) updateKernel() {
+	//ik.er.Put(fmt.Sprintf("%s/kernel-4.19.94.gz", ik.SourceDir), "/tmp/kernel-4.19.94.gz")
+	//ik.er.Run("cd /tmp && tar zxvf kernel-4.19.94.gz && yum remove -y kernel-headers kernel-tools-libs kernel-tools kernel-ml-tools kernel-ml-tools-libs && yum install -y kernel-4.19.94/* ; rm -rf kernel-4.19.94*")
+	//ik.er.Run(`num=$(awk -F \' '$1=="menuentry " {print i++ " : " $2}' /etc/grub2.cfg | grep 4.19.94 | awk '{print $1}') && grub2-set-default $num && grub2-mkconfig -o /boot/grub2/grub.cfg ; grub2-editenv list`)
+	//ik.er.Run("reboot")
+
+	// 上传内核包
 	ik.er.Put(fmt.Sprintf("%s/kernel-4.19.94.gz", ik.SourceDir), "/tmp/kernel-4.19.94.gz")
-	ik.er.Run("cd /tmp && tar zxvf kernel-4.19.94.gz && yum remove -y kernel-headers kernel-tools-libs kernel-tools kernel-ml-tools kernel-ml-tools-libs && yum install -y kernel-4.19.94/* ; rm -rf kernel-4.19.94*")
-	ik.er.Run(`num=$(awk -F \' '$1=="menuentry " {print i++ " : " $2}' /etc/grub2.cfg | grep 4.19.94 | awk '{print $1}') && grub2-set-default $num && grub2-mkconfig -o /boot/grub2/grub.cfg ; grub2-editenv list`)
-	ik.er.Run("reboot")
+
+	// 判断系统类型并执行对应命令
+	ik.er.Run(`
+    if [ -f /etc/redhat-release ]; then
+        # CentOS/RHEL
+        cd /tmp && tar zxvf kernel-4.19.94.gz &&
+        yum remove -y kernel-headers kernel-tools-libs kernel-tools kernel-ml-tools kernel-ml-tools-libs &&
+        yum install -y kernel-4.19.94/* &&
+        rm -rf kernel-4.19.94* &&
+        num=$(awk -F\' '$1=="menuentry " {print i++ " : " $2}' /etc/grub2.cfg | grep 4.19.94 | awk '{print $1}') &&
+        grub2-set-default $num &&
+        grub2-mkconfig -o /boot/grub2/grub.cfg &&
+        grub2-editenv list
+    else
+        # Ubuntu/Debian
+        cd /tmp && tar zxvf kernel-4.19.94.gz &&
+        apt remove -y linux-headers-* linux-tools-* &&
+        dpkg -i kernel-4.19.94/*.deb &&
+        rm -rf kernel-4.19.94* &&
+        update-grub &&
+        grub-set-default "$(grep -oP "menuentry '\K.*4.19.94.*(?=')" /boot/grub/grub.cfg | head -n 1)" &&
+        update-grub
+    fi &&
+    reboot
+`)
+
 }
 
 func (ik *InstallK8s) InstallBaseBin() {
@@ -396,15 +435,55 @@ func (ik *InstallK8s) installLvs() {
 	etcdLbHost := strings.Split(etcdLbRole.Hosts[0], ":")[0]
 	masterLbHost := strings.Split(masterLbRole.Hosts[0], ":")[0]
 
+	//cmds := []string{
+	//	`apt-get install -y ipvsadm`,
+	//	`systemctl enable ipvsadm`,
+	//	`systemctl start ipvsadm`,
+	//	fmt.Sprintf(`ifconfig eth0:lvs:0 %s broadcast %s netmask 255.255.255.255 up && echo -e "#/bin/sh\n# chkconfig:   2345 90 10\nifconfig eth0:lvs:0 %s broadcast %s netmask 255.255.255.255 up" > /etc/rc.d/init.d/vip_route_lvs.sh`, etcdLbHost, etcdLbHost, etcdLbHost, etcdLbHost),
+	//	fmt.Sprintf(`ifconfig eth0:lvs:1 %s broadcast %s netmask 255.255.255.255 up && echo "ifconfig eth0:lvs:1 %s broadcast %s netmask 255.255.255.255 up" >> /etc/rc.d/init.d/vip_route_lvs.sh`, masterLbHost, masterLbHost, masterLbHost, masterLbHost),
+	//	fmt.Sprintf(`route add -host %s dev eth0:lvs:0 ; echo "" > /dev/null && echo "route add -host %s dev eth0:lvs:0 ; echo "" > /dev/null" >> /etc/rc.d/init.d/vip_route_lvs.sh`, etcdLbHost, etcdLbHost),
+	//	fmt.Sprintf(`route add -host %s dev eth0:lvs:1 ; echo "" > /dev/null && echo "route add -host %s dev eth0:lvs:1 ; echo "" > /dev/null" >> /etc/rc.d/init.d/vip_route_lvs.sh`, masterLbHost, masterLbHost),
+	//	`chmod +x /etc/rc.d/init.d/vip_route_lvs.sh && chkconfig --add vip_route_lvs.sh && chkconfig vip_route_lvs.sh on`,
+	//	`echo "1" > /proc/sys/net/ipv4/ip_forward`,
+	//}
+
 	cmds := []string{
-		`yum install -y ipvsadm && systemctl enable ipvsadm`,
-		fmt.Sprintf(`ifconfig eth0:lvs:0 %s broadcast %s netmask 255.255.255.255 up && echo -e "#/bin/sh\n# chkconfig:   2345 90 10\nifconfig eth0:lvs:0 %s broadcast %s netmask 255.255.255.255 up" > /etc/rc.d/init.d/vip_route_lvs.sh`, etcdLbHost, etcdLbHost, etcdLbHost, etcdLbHost),
-		fmt.Sprintf(`ifconfig eth0:lvs:1 %s broadcast %s netmask 255.255.255.255 up && echo "ifconfig eth0:lvs:1 %s broadcast %s netmask 255.255.255.255 up" >> /etc/rc.d/init.d/vip_route_lvs.sh`, masterLbHost, masterLbHost, masterLbHost, masterLbHost),
-		fmt.Sprintf(`route add -host %s dev eth0:lvs:0 ; echo "" > /dev/null && echo "route add -host %s dev eth0:lvs:0 ; echo "" > /dev/null" >> /etc/rc.d/init.d/vip_route_lvs.sh`, etcdLbHost, etcdLbHost),
-		fmt.Sprintf(`route add -host %s dev eth0:lvs:1 ; echo "" > /dev/null && echo "route add -host %s dev eth0:lvs:1 ; echo "" > /dev/null" >> /etc/rc.d/init.d/vip_route_lvs.sh`, masterLbHost, masterLbHost),
-		`chmod +x /etc/rc.d/init.d/vip_route_lvs.sh && chkconfig --add vip_route_lvs.sh && chkconfig vip_route_lvs.sh on`,
-		`echo "1" > /proc/sys/net/ipv4/ip_forward`,
+		// 安装 ipvsadm
+		`apt-get install -y ipvsadm`,
+		`systemctl enable ipvsadm`,
+		`systemctl start ipvsadm`,
+
+		// TODO 自动获取物理接口名称
+		// ip link show | awk -F': ' '/state UP/ {print $2; exit}'
+		// ip -o link show | awk -F': ' '{print $2}' | grep -Ev '^(lo|docker|virbr|veth|br-|tun|tap|cali|flannel|cni)'
+		// ls /sys/class/net | grep -Ev '^(lo|docker|virbr|veth|br-|tun|tap|cali|flannel|cni)'
+
+		// 创建虚拟接口并持久化配置
+		fmt.Sprintf(`ip addr add %s/32 dev eth0 label eth0:lvs0 && `+
+			`echo -e "#!/bin/sh\nip addr add %s/32 dev eth0 label eth0:lvs0" > /etc/network/if-up.d/vip_route_lvs`,
+			etcdLbHost, etcdLbHost),
+
+		fmt.Sprintf(`ip addr add %s/32 dev eth0 label eth0:lvs1 && `+
+			`echo "ip addr add %s/32 dev eth0 label eth0:lvs1" >> /etc/network/if-up.d/vip_route_lvs`,
+			masterLbHost, masterLbHost),
+
+		// 添加路由并持久化
+		fmt.Sprintf(`ip route add %s/32 dev eth0:lvs0 && `+
+			`echo "ip route add %s/32 dev eth0:lvs0" >> /etc/network/if-up.d/vip_route_lvs`,
+			etcdLbHost, etcdLbHost),
+
+		fmt.Sprintf(`ip route add %s/32 dev eth0:lvs1 && `+
+			`echo "ip route add %s/32 dev eth0:lvs1" >> /etc/network/if-up.d/vip_route_lvs`,
+			masterLbHost, masterLbHost),
+
+		// 设置脚本权限
+		`chmod +x /etc/network/if-up.d/vip_route_lvs`,
+
+		// 启用IP转发
+		`echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf`,
+		`sysctl -p`,
 	}
+
 	ik.er.Run(cmds...)
 
 	// etcd
@@ -421,9 +500,20 @@ func (ik *InstallK8s) installLvs() {
 		ipvsadm = fmt.Sprintf(`%s-a -t %s:6443 -r %s:6443 -g -w 1\n`, ipvsadm, masterLbHost, curHost)
 	}
 
+	//cmds = []string{
+	//	fmt.Sprintf(`echo "%s" > /etc/sysconfig/ipvsadm`, ipvsadm),
+	//	`systemctl restart ipvsadm && ipvsadm -Ln`,
+	//}
+
 	cmds = []string{
-		fmt.Sprintf(`echo "%s" > /etc/sysconfig/ipvsadm`, ipvsadm),
-		`systemctl restart ipvsadm && ipvsadm -Ln`,
+		// 保存规则到 Ubuntu 的默认路径（/etc/ipvsadm.rules）
+		fmt.Sprintf(`echo "%s" > /etc/ipvsadm.rules`, ipvsadm),
+
+		// 检查 systemd 是否管理 ipvsadm（Ubuntu 默认不提供 ipvsadm.service，需手动加载）
+		`if systemctl list-unit-files | grep -q ipvsadm; then systemctl restart ipvsadm; else ipvsadm-restore < /etc/ipvsadm.rules; fi`,
+
+		// 验证规则是否生效
+		`ipvsadm -Ln`,
 	}
 
 	ik.er.Run(cmds...)
@@ -494,10 +584,22 @@ func (ik *InstallK8s) installLvsNew() {
 		ipvsadm = fmt.Sprintf(`%s-a -t %s:6443 -r %s:6443 -g -w 1\n`, ipvsadm, masterLbHost, curHost)
 	}
 
+	//cmds := []string{
+	//	fmt.Sprintf(`echo "%s" > /etc/sysconfig/ipvsadm`, ipvsadm),
+	//	`systemctl start ipvsadm && ipvsadm -Ln`,
+	//}
+
 	cmds := []string{
-		fmt.Sprintf(`echo "%s" > /etc/sysconfig/ipvsadm`, ipvsadm),
-		`systemctl start ipvsadm && ipvsadm -Ln`,
+		// 保存规则到 Ubuntu 的默认路径（/etc/ipvsadm.rules）
+		fmt.Sprintf(`echo "%s" > /etc/ipvsadm.rules`, ipvsadm),
+
+		// 检查 systemd 是否管理 ipvsadm（Ubuntu 默认不提供 ipvsadm.service，需手动加载）
+		`if systemctl list-unit-files | grep -q ipvsadm; then systemctl restart ipvsadm; else ipvsadm-restore < /etc/ipvsadm.rules; fi`,
+
+		// 验证规则是否生效
+		`ipvsadm -Ln`,
 	}
+
 	ik.er.Run(cmds...)
 }
 
@@ -523,7 +625,8 @@ func (ik *InstallK8s) InstallDns() {
 	registryHost := strings.Split(registryRole.Hosts[0], ":")[0]
 
 	ik.er.SetRole(pridnsRole)
-	ik.er.Run("yum install -y bind-chroot")
+	//ik.er.Run("yum install -y bind-chroot")
+	ik.er.Run("apt install -y bind9 bind9utils bind9-doc dnsutils")
 
 	ik.er.SetRole(publishRole)
 
@@ -540,12 +643,19 @@ func (ik *InstallK8s) InstallDns() {
 
 	ik.er.SetRole(pridnsRole)
 	ik.er.Put(fmt.Sprintf("%s/bind/bind.gz", ik.SourceDir), "/tmp")
-	ik.er.Run("tar zxvf /tmp/bind.gz -C / && rm -rf /tmp/bind.gz && chown -R named:named /var/named/zones && chown root:named /var/named /etc/named.conf /etc/named.rfc1912.zones && systemctl enable --now named-chroot && systemctl restart named-chroot")
+	ik.er.Run("tar zxvf /tmp/bind.gz -C / && rm -rf /tmp/bind.gz && chown -R named:named /var/named/zones && chown root:named /var/named /etc/named.conf /etc/named.rfc1912.zones")
+	// systemctl enable --now named-chroot && systemctl restart named-chroot
+	ik.er.Run("systemctl start named && systemctl enable named")
 	ik.er.Local(fmt.Sprintf("rm -rf %s/bind/bind.gz", ik.SourceDir))
 
 	// 发布机添加DNS记录
 	ik.er.SetRole(publishRole)
-	ik.er.Run(fmt.Sprintf(`nmcli con mod "$(nmcli -t -f NAME connection show | head -n 1)" ipv4.dns "%s" && systemctl restart NetworkManager`, registryHost))
+	ik.er.Run(fmt.Sprintf(`nmcli con mod "$(nmcli -t -f NAME connection show | head -n 1)" ipv4.dns "%s"`, registryHost))
+
+	// systemctl restart NetworkManager
+	//ik.er.Run("rndc reload && systemd-resolve --flush-caches")
+	ik.er.Run("ufw allow 53 && systemctl restart systemd-networkd")
+
 }
 
 func strInArr(str string, arr []string) bool {

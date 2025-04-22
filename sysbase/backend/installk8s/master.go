@@ -230,12 +230,28 @@ func (ik *InstallK8s) installLvsvipMaster(masterNode execremote.Role) {
 	masterLbHost := strings.Split(masterLbRole.Hosts[0], ":")[0]
 
 	ik.er.SetRole(masterNode)
+	//cmds := []string{
+	//	fmt.Sprintf(`ifconfig lo:master:0 %s broadcast %s netmask 255.255.255.255 up && echo -e "#/bin/sh\n# chkconfig:   2345 90 10\nifconfig lo:master:0 %s broadcast %s netmask 255.255.255.255 up" > /etc/rc.d/init.d/vip_route_master.sh`, masterLbHost, masterLbHost, masterLbHost, masterLbHost),
+	//	fmt.Sprintf(`route add -host %s dev lo:master:0 && echo "route add -host %s dev lo:master:0" >> /etc/rc.d/init.d/vip_route_master.sh`, masterLbHost, masterLbHost),
+	//	`chmod +x /etc/rc.d/init.d/vip_route_master.sh && chkconfig --add vip_route_master.sh && chkconfig vip_route_master.sh on`,
+	//
+	//	`echo "1" > /proc/sys/net/ipv4/conf/lo/arp_ignore && echo "2" > /proc/sys/net/ipv4/conf/lo/arp_announce && echo "1" > /proc/sys/net/ipv4/conf/all/arp_ignore && echo "2" > /proc/sys/net/ipv4/conf/all/arp_announce`,
+	//}
 	cmds := []string{
-		fmt.Sprintf(`ifconfig lo:master:0 %s broadcast %s netmask 255.255.255.255 up && echo -e "#/bin/sh\n# chkconfig:   2345 90 10\nifconfig lo:master:0 %s broadcast %s netmask 255.255.255.255 up" > /etc/rc.d/init.d/vip_route_master.sh`, masterLbHost, masterLbHost, masterLbHost, masterLbHost),
-		fmt.Sprintf(`route add -host %s dev lo:master:0 && echo "route add -host %s dev lo:master:0" >> /etc/rc.d/init.d/vip_route_master.sh`, masterLbHost, masterLbHost),
-		`chmod +x /etc/rc.d/init.d/vip_route_master.sh && chkconfig --add vip_route_master.sh && chkconfig vip_route_master.sh on`,
+		// 创建虚拟接口
+		fmt.Sprintf(`ip addr add %s/32 dev lo label lo:master:0 && echo -e '#!/bin/sh\n### BEGIN INIT INFO\n# Provides:          vip_route_master\n# Required-Start:    $network\n# Required-Stop:     $network\n# Default-Start:     2 3 4 5\n# Default-Stop:      0 1 6\n# Short-Description: VIP route master\n### END INIT INFO\nip addr add %s/32 dev lo label lo:master:0' > /etc/init.d/vip_route_master.sh`, masterLbHost, masterLbHost),
 
+		// 添加路由
+		fmt.Sprintf(`ip route add %s dev lo:master:0 && echo "ip route add %s dev lo:master:0" >> /etc/init.d/vip_route_master.sh`, masterLbHost, masterLbHost),
+
+		// 设置权限并启用服务
+		`chmod +x /etc/init.d/vip_route_master.sh && if command -v update-rc.d >/dev/null; then update-rc.d vip_route_master.sh defaults; else chkconfig --add vip_route_master.sh && chkconfig vip_route_master.sh on; fi`,
+
+		// ARP设置
 		`echo "1" > /proc/sys/net/ipv4/conf/lo/arp_ignore && echo "2" > /proc/sys/net/ipv4/conf/lo/arp_announce && echo "1" > /proc/sys/net/ipv4/conf/all/arp_ignore && echo "2" > /proc/sys/net/ipv4/conf/all/arp_announce`,
+
+		// 使ARP设置持久化
+		`grep -q "arp_ignore" /etc/sysctl.conf || echo -e "net.ipv4.conf.lo.arp_ignore = 1\nnet.ipv4.conf.lo.arp_announce = 2\nnet.ipv4.conf.all.arp_ignore = 1\nnet.ipv4.conf.all.arp_announce = 2" >> /etc/sysctl.conf && sysctl -p`,
 	}
 	ik.er.Run(cmds...)
 }

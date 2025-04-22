@@ -29,7 +29,9 @@ func (ik *InstallK8s) InstallContainerd() {
 
 func (ik *InstallK8s) installContainerd() {
 	ik.er.Put(fmt.Sprintf("%s/containerd/package.gz", ik.SourceDir), "/tmp")
-	ik.er.Run("yum install -y libseccomp && tar zxvf /tmp/package.gz -C / && rm -rf /tmp/package.gz && mkdir -p /data/containerd && systemctl daemon-reload && systemctl enable containerd")
+	// yum install -y libseccomp
+	ik.er.Run("apt-get install -y libseccomp-dev")
+	ik.er.Run("tar zxvf /tmp/package.gz -C / && rm -rf /tmp/package.gz && mkdir -p /data/apps/containerd && systemctl daemon-reload && systemctl enable containerd")
 }
 
 func (ik *InstallK8s) InstallRegistry() {
