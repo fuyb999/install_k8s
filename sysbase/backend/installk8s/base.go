@@ -626,7 +626,7 @@ func (ik *InstallK8s) InstallDns() {
 
 	ik.er.SetRole(pridnsRole)
 	//ik.er.Run("yum install -y bind-chroot")
-	ik.er.Run("apt install -y bind9 bind9utils bind9-doc dnsutils")
+	ik.er.Run("apt-get install -y bind9 bind9utils bind9-doc dnsutils")
 
 	ik.er.SetRole(publishRole)
 
